@@ -44,7 +44,16 @@ gmarketHtml = """
 from scrapy.spider import BaseSpider
 from scrapy.selector import HtmlXPathSelector
 
-class ElevenStSpider(BaseSpider):
+class ShoppingmallSpider(BaseSpider):
+    def mySelect(self, hxs, string):
+        s = hxs.select(string)
+        if len(s) == 0:
+            return ""
+        else:
+            return s.extract()[0].encode("utf-8")
+
+
+class ElevenStSpider(ShoppingmallSpider):
     """ Spider for www.11st.co.kr """
 
     name = "11st spider"
@@ -53,21 +62,21 @@ class ElevenStSpider(BaseSpider):
         hxs = HtmlXPathSelector(response)
         
         # get data
-        name = hxs.select('//p[@class="pro_tit_v2"]/text()').extract()[0].encode("utf-8")
-        price = hxs.select('//*[@id="addAllSelPrc"]/@value').extract()[0].encode("utf-8")
-        disPrice = hxs.select('//*[@name="discountPrc"]/@value').extract()[0].encode("utf-8")
+        name = self.mySelect(hxs, '//p[@class="pro_tit_v2"]/text()')
+        price = self.mySelect(hxs, '//*[@id="addAllSelPrc"]/@value')
+        disPrice = self.mySelect(hxs, '//*[@name="discountPrc"]/@value')
         diff = str(int(price) - int(disPrice))
 
         # each product has different type of delivery charge
         deliveryCharge = hxs.select('//*[@id="dlvCstInfo3"]').extract()[0]
         if(deliveryCharge.find("<span") == 0): # always same value
-            deliveryCharge = hxs.select('//*[@id="dlvCstInfo3"]/text()').extract()[0].encode("utf-8")
+            deliveryCharge = self.mySelect(hxs, '//*[@id="dlvCstInfo3"]/text()')
         else: # changed by dropdown box
-            deliveryCharge = hxs.select('//*[@id="dlvCstInfo3"]/span/text()').extract()[0].encode("utf-8")
+            deliveryCharge = self.mySelect(hxs, '//*[@id="dlvCstInfo3"]/span/text()')
 
-        sellerId = hxs.select('//*[@id="prodetail_ns4"]/div[1]/div[2]/p[1]/a/text()').extract()[0].encode("utf-8")
-        companyName = hxs.select('//*[@id="dvPrdInfoWrap"]/table[4]/tr[1]/td[2]/text()').extract()[0].encode("utf-8")
-        registerNo = hxs.select('//*[@id="dvPrdInfoWrap"]/table[4]/tr[2]/td[1]/span/text()').extract()[0].encode("utf-8")
+        sellerId = self.mySelect(hxs, '//*[@id="prodetail_ns4"]/div[1]/div[2]/p[1]/a/text()')
+        companyName = self.mySelect(hxs, '//*[@id="dvPrdInfoWrap"]/table[4]/tr[1]/td[2]/text()')
+        registerNo = self.mySelect(hxs, '//*[@id="dvPrdInfoWrap"]/table[4]/tr[2]/td[1]/span/text()')
         
         # render template
         html = gmarketHtml.format(name, price, disPrice, diff, deliveryCharge, sellerId, companyName, registerNo)
@@ -76,29 +85,29 @@ class ElevenStSpider(BaseSpider):
         self.request.write(html)
         self.request.finish()
 
-class GmartketSpider(BaseSpider):
-    """ Spider for www.gmarket.co.kr """
+class GmartketSpider(ShoppingmallSpider):
+    """ Spider for item.gmarket.co.kr """
 
-    name = "Gmaret spider"
+    name = "Gmarket spider"
 
     def parse(self, response):
         hxs = HtmlXPathSelector(response)
         
         # get data
-        name = hxs.select('//*[@class="tit-goodsnum"]/p/text()').extract()[0].encode("utf-8")
-        price = hxs.select('//*[@id="order_price"]/@value').extract()[0].encode("utf-8")
+        name = self.mySelect(hxs, '//*[@class="tit-goodsnum"]/p/text()')
+        price = self.mySelect(hxs, '//*[@id="order_price"]/@value')
 
         # disPrice in Gmarket contains ','
-        disPrice = hxs.select('//span[@id="dc_price"]/text()').extract()[0].encode("utf-8")
-        disPrice = disPrice.replace(",", "")
+        disPrice = self.mySelect(hxs, '//span[@id="dc_price"]/text()').replace(",", "").replace(",", "")
 
         diff = str(int(price) - int(disPrice))
 
-        deliveryCharge = hxs.select('//*[@id="delivery_fee_tr"]/td/div/strong/text()').extract()[0].encode("utf-8")
+        deliveryCharge = self.mySelect(hxs, '//*[@id="delivery_fee_tr"]/td/div/strong/text()')
 
-        sellerNameCode = hxs.select('//*[@class="goods-info"]/tbody')[1].select('tr[1]/td[1]/script').extract()[0]
-        companyNameCode = hxs.select('//*[@class="goods-info"]/tbody')[1].select('tr[1]/td[2]/script').extract()[0]
-        registerNoCode = hxs.select('//*[@class="goods-info"]/tbody')[1].select('tr[4]/td[1]/script').extract()[0]
+        # following filed are encoded. use orignal javascript code to decode field
+        sellerNameCode = self.mySelect(hxs, '//*[@class="goods-info"][2]/tbody/tr[1]/td[1]/script')
+        companyNameCode = self.mySelect(hxs, '//*[@class="goods-info"][2]/tbody/tr[1]/td[2]/script')
+        registerNoCode = self.mySelect(hxs, '//*[@class="goods-info"][2]/tbody/tr[4]/td[1]/script')
 
         # render template
         html = gmarketHtml.format(name, price, disPrice, diff, deliveryCharge, sellerNameCode, companyNameCode, registerNoCode)
@@ -106,6 +115,38 @@ class GmartketSpider(BaseSpider):
         # return html string
         self.request.write(html)
         self.request.finish()
+
+class BrandonSpider(ShoppingmallSpider):
+    """ Spider for brandon.gmarket.co.kr """
+
+    name = "Gmarket(BrandOn) spider"
+
+    def parse(self, response):
+        hxs = HtmlXPathSelector(response)
+        
+        # get data
+        name = self.mySelect(hxs, '//*[@id="brand-container"]/div[1]/div[1]/div[2]/div/h2/text()')
+        price = self.mySelect(hxs, '//*[@id="order_price"]/@value')
+
+        # disPrice in Gmarket contains ','
+        disPrice = self.mySelect(hxs, '//span[@id="dc_price"]/script')
+
+        diff = "Can't calculated"
+
+        deliveryCharge = self.mySelect(hxs, '//*[@id="delivery_fee_tr"]/td/div/strong/text()')
+
+        # following filed are encoded. use orignal javascript code to decode field
+        sellerNameCode = self.mySelect(hxs, '//*[@id="brand-container"]/div[3]/div[7]/table/tbody/tr[1]/td[1]/script')
+        companyNameCode = self.mySelect(hxs, '//*[@id="brand-container"]/div[3]/div[7]/table/tbody/tr[1]/td[2]/script')
+        registerNoCode = self.mySelect(hxs, '//*[@id="brand-container"]/div[3]/div[7]/table/tbody/tr[3]/td[1]/script')
+
+        # render template
+        html = gmarketHtml.format(name, price, disPrice, diff, deliveryCharge, sellerNameCode, companyNameCode, registerNoCode)
+    
+        # return html string
+        self.request.write(html)
+        self.request.finish()
+
 
 from twisted.web import server, resource, static
 from twisted.internet import reactor
@@ -125,6 +166,8 @@ class Parser(resource.Resource):
             spider = ElevenStSpider()
         elif(url[0].find("item.gmarket.co.kr") >= 0):
             spider = GmartketSpider()
+        elif(url[0].find("brandon.gmarket.co.kr") >= 0):
+            spider = BrandonSpider()
         else:
             return "Invalid URL. Please check again<br />" + url[0]
 
