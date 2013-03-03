@@ -5,6 +5,7 @@ elevenStHtml = """
 <html>
     <head>
         <script language="javascript" type="text/javascript" src="jsFlashEncode.js"></script>
+        <script language="javascript" type="text/javascript" src="common.js"></script>
     </head>
 
     <body>
@@ -26,6 +27,7 @@ gmarketHtml = """
 <html>
     <head>
         <script language="javascript" type="text/javascript" src="jsFlashEncode.js"></script>
+        <script language="javascript" type="text/javascript" src="common.js"></script>
     </head>
 
     <body>
@@ -127,10 +129,7 @@ class BrandonSpider(ShoppingmallSpider):
         # get data
         name = self.mySelect(hxs, '//*[@id="brand-container"]/div[1]/div[1]/div[2]/div/h2/text()')
         price = self.mySelect(hxs, '//*[@id="order_price"]/@value')
-
-        # disPrice in Gmarket contains ','
         disPrice = self.mySelect(hxs, '//span[@id="dc_price"]/script')
-
         diff = "Can't calculated"
 
         deliveryCharge = self.mySelect(hxs, '//*[@id="delivery_fee_tr"]/td/div/strong/text()')
@@ -146,6 +145,37 @@ class BrandonSpider(ShoppingmallSpider):
         # return html string
         self.request.write(html)
         self.request.finish()
+
+class AuctionSpider(ShoppingmallSpider):
+    """ Spider for www.auction.co.kr """
+
+    name = "Auction spider"
+
+    def parse(self, response):
+        hxs = HtmlXPathSelector(response)
+        
+        # get data
+        name = self.mySelect(hxs, '////h2[@id="hdivItemTitle"]/text()[1]')
+        price = self.mySelect(hxs, '//input[@id="hddnSellingPrice"]/@value')
+        disPrice = self.mySelect(hxs, '//input[@id="hddnDiscountSellingPrice"]/@value')
+        if(int(disPrice) == 0):
+            disPrice = price
+        diff = str(int(price) - int(disPrice))
+
+        deliveryCharge = self.mySelect(hxs, '//*[@id="st1"]/span/text()')
+
+        # following filed are encoded. use orignal javascript code to decode field
+        sellerNameCode = self.mySelect(hxs, '//*[@id="htblCorpMemberInfo"]/tr[1]/td[1]/script')
+        companyNameCode = self.mySelect(hxs, '//*[@id="htblCorpMemberInfo"]/tr[2]/td[1]/script')
+        registerNoCode = self.mySelect(hxs, '//*[@id="htblCorpMemberInfo"]/tr[2]/td[2]/script')
+
+        # render template
+        html = gmarketHtml.format(name, price, disPrice, diff, deliveryCharge, sellerNameCode, companyNameCode, registerNoCode)
+    
+        # return html string
+        self.request.write(html)
+        self.request.finish()
+
 
 
 from twisted.web import server, resource, static
@@ -168,6 +198,8 @@ class Parser(resource.Resource):
             spider = GmartketSpider()
         elif(url[0].find("brandon.gmarket.co.kr") >= 0):
             spider = BrandonSpider()
+        elif(url[0].find("http://itempage3.auction.co.kr") >= 0):
+            spider = AuctionSpider()
         else:
             return "Invalid URL. Please check again<br />" + url[0]
 
@@ -185,6 +217,7 @@ root = resource.Resource()
 # static pages
 root.putChild("",                   static.File("./index.html"))
 root.putChild("jsFlashEncode.js",   static.File("./jsFlashEncode.js"))
+root.putChild("common.js",          static.File("./common.js"))
 
 # dynamic pages
 root.putChild("parser", Parser())
